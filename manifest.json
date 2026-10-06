@@ -1,0 +1,66 @@
+{
+  "name": "Ascend \u2014 Habit Quest",
+  "short_name": "Ascend",
+  "description": "Habits, tasks, challenges and coins. Opens straight on Today.",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#12160F",
+  "theme_color": "#12160F",
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "url": "./index.html?source=shortcut",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Compact today view",
+      "short_name": "Compact",
+      "url": "./index.html#glance",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./index.html",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ]
+}

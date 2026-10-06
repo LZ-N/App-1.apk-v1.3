@@ -1,0 +1,11 @@
+{
+  "name": "ascend-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ascend habit tracker wrapped as an Android app with a Today widget",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}
