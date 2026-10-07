@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="1">
+<meta name="app-version" content="3">
 <script>
 /* Self-update (Android app only). The app checks the website copy of this file in the background.
    When its app-version number is higher, it keeps the new copy and uses it from the next launch.
@@ -382,6 +382,17 @@
   .arch-day{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-soft);margin:14px 0 6px;}
   .arch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:6px;background:var(--bg);border:1px solid var(--border-soft);border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.2);}
   @media (display-mode:standalone){#app{padding-top:max(26px,env(safe-area-inset-top));}}
+  .task-block{padding:2px 0;}
+  .task-done{color:var(--text-muted);text-decoration:line-through;opacity:.6;}
+  .part-count{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;padding:0 6px;border-radius:99px;border:1px solid var(--border);font-size:12px;color:var(--text-muted);flex:none;box-sizing:border-box;}
+  .part-count.done{background:var(--sage);border-color:var(--sage);color:#0f1a10;opacity:.7;}
+  .parts{margin:6px 0 4px 18px;padding-left:14px;border-left:2px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;}
+  .part-row{display:flex;align-items:center;gap:10px;font-size:14px;}
+  .part-row.part-done span{color:var(--text-muted);text-decoration:line-through;opacity:.6;}
+  .check-circle.sm{width:26px;height:26px;}
+  .check-circle.sm svg{width:12px;height:12px;}
+  .coin-row{padding:8px 0;border-bottom:1px solid var(--border-soft);}
+  .coin-row:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -546,6 +557,51 @@ function chalDayStats(){
  ['earn_500',400,'Big Earner','Earn $500 in coins overall',function(s,d){ return lifetimeEarnedCents()>=50000; }],
  ['earn_1000',800,'Coin Baron','Earn $1,000 in coins overall',function(s,d){ return lifetimeEarnedCents()>=100000; }],
  ['spent_50',50,'Big Spender','Spend $50 in total',function(s,d){ return totalSpentCents()>=5000; }]
+].forEach(function(a){ ACHIEVEMENTS.push({ id:a[0], coin:a[1], name:a[2], desc:a[3], check:a[4] }); });
+function chalDayStreakBest(){
+  var set={}; (state.challengeLogs||[]).forEach(function(l){ set[l.dateKey]=1; });
+  var days=Object.keys(set).sort(), best=0, run=0, prev=null;
+  days.forEach(function(k){ if(prev && addDaysKey(prev,1)===k) run++; else run=1; if(run>best) best=run; prev=k; });
+  return best;
+}
+function chalLimitHit(){
+  var by={}; (state.challengeLogs||[]).forEach(function(l){ var k=l.challengeId+'|'+l.dateKey; by[k]=(by[k]||0)+1; });
+  return (state.challenges||[]).some(function(c){
+    if(!(c.limit>0)) return false;
+    return Object.keys(by).some(function(k){ return k.indexOf(c.id+'|')===0 && by[k]>=c.limit; });
+  });
+}
+function chalWeekBest(){
+  var by={}, best=0; (state.challengeLogs||[]).forEach(function(l){ var w=weekKeyFor(l.dateKey); by[w]=(by[w]||0)+1; if(by[w]>best) best=by[w]; });
+  return best;
+}
+function chalAllTried(){
+  var cs=state.challenges||[]; if(cs.length<3) return false;
+  return cs.every(function(c){ return challengeCountTotal(c.id)>0; });
+}
+function chalHardLogged(){
+  return (state.challengeLogs||[]).some(function(l){
+    var c=(state.challenges||[]).filter(function(x){ return x.id===l.challengeId; })[0];
+    return c && tierRank(c.tier)>=3;
+  });
+}
+function wheelComboDay(){
+  var cnt={}; (state.challengeLogs||[]).forEach(function(l){ cnt[l.dateKey]=(cnt[l.dateKey]||0)+1; });
+  return (state.wheelLog||[]).some(function(w){ return (cnt[w.dateKey]||0)>=5; });
+}
+[
+ ['chal_50',100,'Half Century','Finish 50 challenges',function(s,d){ return d.challengesDone>=50; }],
+ ['chal_500',1500,'Challenge Veteran','Finish 500 challenges',function(s,d){ return d.challengesDone>=500; }],
+ ['chal_1000',3000,'Challenge Legend','Finish 1,000 challenges',function(s,d){ return d.challengesDone>=1000; }],
+ ['chal_streak_3',40,'Three Days Running','Do a challenge 3 days in a row',function(s,d){ return chalDayStreakBest()>=3; }],
+ ['chal_streak_7',150,'Challenge Week','Do a challenge 7 days in a row',function(s,d){ return chalDayStreakBest()>=7; }],
+ ['chal_streak_30',700,'Challenge Month','Do a challenge 30 days in a row',function(s,d){ return chalDayStreakBest()>=30; }],
+ ['chal_day20',500,'Marathon Day','20 challenges in one day',function(s,d){ return chalDayStats().best>=20; }],
+ ['chal_limit',40,'Maxed Out','Hit the daily limit on a challenge',function(s,d){ return chalLimitHit(); }],
+ ['chal_week_30',150,'Weekly Grind','30 challenges in one week',function(s,d){ return chalWeekBest()>=30; }],
+ ['chal_all',100,'Tried Them All','Finish every challenge at least once (3+ challenges)',function(s,d){ return chalAllTried(); }],
+ ['chal_hard',60,'Hard Mode','Finish a Hard (or higher) challenge',function(s,d){ return chalHardLogged(); }],
+ ['chal_wheel_day',120,'Full Send','Claim the wheel prize and finish 5 challenges in one day',function(s,d){ return wheelComboDay(); }]
 ].forEach(function(a){ ACHIEVEMENTS.push({ id:a[0], coin:a[1], name:a[2], desc:a[3], check:a[4] }); });
 var STICKY_ACH=['piggy_bank','stash','vault','treat_yourself','spent_50'];
 function achTier(a){
@@ -765,6 +821,12 @@ function nativePlugin(n){
 }
 function widgetSnapshot(){
   var t=todayKey(), items=[];
+  var allTasks=(state.tasks||[]);
+  allTasks.filter(function(x){ return !x.done; }).concat(allTasks.filter(function(x){ return x.done && x.completedAt===t; })).forEach(function(x){
+    var parts=x.parts||[];
+    items.push({ k:'t', id:x.id, name:x.name, tier:tierInfo(x.tier||nearestTier(x.points)).label, done:!!x.done, np:parts.length, pd:parts.filter(function(q){ return q.done; }).length });
+    if(parts.length && !x.done) parts.forEach(function(q){ items.push({ k:'p', id:x.id, pid:q.id, name:q.name, done:!!q.done }); });
+  });
   (state.habits||[]).forEach(function(h){
     if(h.archived || compareKeys(h.createdAt,t)>0) return;
     items.push({ k:'h', id:h.id, name:h.name, tier:tierInfo(h.difficulty).label, done:h.completions.hasOwnProperty(t) });
@@ -772,14 +834,9 @@ function widgetSnapshot(){
   (state.challenges||[]).forEach(function(c){
     items.push({ k:'c', id:c.id, name:c.name, tier:tierInfo(c.tier||nearestTier(c.points)).label, n:challengeCountToday(c.id), limit:c.limit||0 });
   });
-  (state.tasks||[]).filter(function(x){ return !x.done || x.completedAt===t; }).sort(function(a,b){
-    if(a.done!==b.done) return a.done?1:-1;
-    if(a.deadline&&b.deadline) return compareKeys(a.deadline,b.deadline);
-    if(a.deadline) return -1; if(b.deadline) return 1; return 0;
-  }).slice(0,12).forEach(function(x){
-    items.push({ k:'t', id:x.id, name:x.name, tier:tierInfo(x.tier||nearestTier(x.points)).label, done:!!x.done });
-  });
-  return { date:t, items:items };
+  var w=wheelToday();
+  items.push({ k:'w', id:'wheel', name:w?w.mission:'Daily wheel', status:w?w.status:'none' });
+  return { v:2, date:t, items:items };
 }
 function widgetSync(){
   var B=nativePlugin('WidgetBridge');
@@ -793,25 +850,33 @@ function applyWidgetQueue(){
     var q=(r && r.value)?safeParse(r.value):null;
     if(!q || !q.length) return;
     var n=0;
-    q.forEach(function(e){
-      try{
-        if(e.a==='habit'){
-          var h=findHabit(e.id);
-          if(h){
-            var d=(e.date && compareKeys(e.date,todayKey())<=0)?e.date:todayKey();
-            if(h.completions.hasOwnProperty(d)!==!!e.want){ toggleHabitDay(h.id,d); n++; }
+    replayAward=true;
+    try{
+      q.forEach(function(e){
+        try{
+          var dk=(e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && compareKeys(e.date,todayKey())<=0)?e.date:todayKey();
+          if(e.a==='habit'){
+            var h=findHabit(e.id);
+            if(h && h.completions.hasOwnProperty(dk)!==!!e.want){ toggleHabitDay(h.id,dk); n++; }
+          } else if(e.a==='task'){
+            var tk=findTask(e.id);
+            if(tk && !!tk.done!==!!e.want){ toggleTask(tk.id,dk); n++; }
+          } else if(e.a==='part'){
+            var tk2=findTask(e.id);
+            var pt2=tk2?(tk2.parts||[]).filter(function(x){ return x.id===e.pid; })[0]:null;
+            if(pt2 && !!pt2.done!==!!e.want){ togglePart(tk2.id,pt2.id,dk); n++; }
+          } else if(e.a==='wheel'){
+            var wl=state.wheel;
+            if(wl && wl.dateKey===dk && wl.status==='pending'){ claimWheel(dk); n++; }
+          } else if(e.a==='chal'){
+            if(e.d>0) logChallenge(e.id,dk); else undoChallenge(e.id,dk);
+            n++;
           }
-        } else if(e.a==='task'){
-          var tk=(state.tasks||[]).filter(function(x){ return x.id===e.id; })[0];
-          if(tk && !!tk.done!==!!e.want){ toggleTask(tk.id); n++; }
-        } else if(e.a==='chal'){
-          if(e.d>0) logChallenge(e.id); else undoChallenge(e.id);
-          n++;
-        }
-      }catch(err){ console.error('Ascend: widget action failed',err); }
-    });
+        }catch(err){ console.error('Ascend: widget action failed',err); }
+      });
+    } finally { replayAward=false; }
     if(n){ queueToast('Synced '+n+' widget tap'+(n>1?'s':'')); render(); }
-  }).catch(function(){});
+  }).catch(function(){ replayAward=false; });
 }
 
 /* =====================================================================
@@ -972,6 +1037,11 @@ function computeDerived(){
 }
 function categoryXp(catId){
   var xp=0;
+  (state.challengeLogs||[]).forEach(function(l){
+    var c=(state.challenges||[]).filter(function(x){ return x.id===l.challengeId; })[0];
+    var cat=c?(c.category||'other'):(l.cat||'other');
+    if(cat===catId) xp+=l.points||0;
+  });
   (state.habits||[]).forEach(function(h){
     if((h.category||'other')!==catId) return;
     Object.keys(h.completions||{}).forEach(function(k){ xp+=h.completions[k]; });
@@ -1138,8 +1208,9 @@ function awardBonusCoins(cents){
   w.cents=Math.round(w.cents+a); w.daily[t]=Math.round((w.daily[t]||0)+a);
   return a;
 }
+var replayAward=false; /* true only while widget taps from earlier days are being applied */
 function awardCoins(cents,dateKey){
-  if(cents<=0 || dateKey!==todayKey()) return 0;
+  if(cents<=0 || (dateKey!==todayKey() && !replayAward)) return 0;
   var w=state.wallet;
   var exact=cents*(1+boostPercent()/100)+(w.carry||0);
   var whole=Math.floor(exact+1e-9);
@@ -1180,17 +1251,27 @@ function extraPointsOn(dk){
 }
 
 /* ---- repeatable challenges ---- */
-function addChallenge(name,tier,limit){
+function guessCategory(name){
+  var n=String(name||'').toLowerCase();
+  if(/walk|run|jog|push|pull|squat|plank|stretch|water|exercise|workout|gym|sleep|yoga|steps|swim|cycle|bike/.test(n)) return 'health';
+  if(/clean|tidy|dish|laundry|trash|vacuum|wash|cook|organi[sz]e|sweep|mop/.test(n)) return 'chores';
+  if(/read|study|write|learn|code|work|focus|plan|practice|email|inbox/.test(n)) return 'productivity';
+  return 'other';
+}
+function validCategory(c){ return CATEGORIES.some(function(x){ return x.id===c; }); }
+function categoryInfo(id){ return CATEGORIES.filter(function(x){ return x.id===id; })[0]||CATEGORIES[CATEGORIES.length-1]; }
+function addChallenge(name,tier,limit,category){
   name=(name||'').trim(); if(!name) return;
   if(!validTier(tier)) tier='easy';
-  state.challenges.push({ id:uid(), name:name.slice(0,60), tier:tier, points:tierPts(tier), limit:clampInt(limit,0,99,0) });
+  state.challenges.push({ id:uid(), name:name.slice(0,60), tier:tier, points:tierPts(tier), limit:clampInt(limit,0,99,0), category:validCategory(category)?category:guessCategory(name) });
   ui.showAddChallenge=false; persist(); render();
 }
-function editChallenge(id,name,tier,limit){
+function editChallenge(id,name,tier,limit,category){
   var c=state.challenges.filter(function(x){ return x.id===id; })[0];
   name=(name||'').trim();
   if(!c || !name) return;
   c.name=name.slice(0,60); if(validTier(tier)) c.tier=tier; c.points=tierPts(c.tier); c.limit=clampInt(limit,0,99,0);
+  if(validCategory(category)) c.category=category;
   ui.editingChallengeId=null; persist(); render();
 }
 function moveChallenge(id,dir){
@@ -1199,29 +1280,30 @@ function moveChallenge(id,dir){
   var tmp=list[idx]; list[idx]=list[j]; list[j]=tmp;
   persist(); render();
 }
-function challengeCountToday(id){
-  var t=todayKey();
-  return state.challengeLogs.filter(function(l){ return l.challengeId===id && l.dateKey===t; }).length;
+function challengeCountOn(id,dk){
+  return state.challengeLogs.filter(function(l){ return l.challengeId===id && l.dateKey===dk; }).length;
 }
+function challengeCountToday(id){ return challengeCountOn(id,todayKey()); }
 function challengeCountTotal(id){
   return state.challengeLogs.filter(function(l){ return l.challengeId===id; }).length;
 }
-function logChallenge(id){
+function logChallenge(id,dateKey){
   var c=state.challenges.filter(function(x){ return x.id===id; })[0];
   if(!c) return;
-  if(c.limit>0 && challengeCountToday(id)>=c.limit){ queueToast('Daily limit reached for this challenge'); render(); return; }
-  var lb=computeDerived().level, t=todayKey();
+  var t=dateKey||todayKey();
+  if(c.limit>0 && challengeCountOn(id,t)>=c.limit){ queueToast('Daily limit reached for this challenge'); render(); return; }
+  var lb=computeDerived().level;
   var cpts=tierPts(c.tier||nearestTier(c.points));
   var coins=awardCoins(tierCoin(c.tier||nearestTier(c.points)),t);
-  state.challengeLogs.push({ id:uid(), challengeId:id, name:c.name, points:cpts, coins:coins, dateKey:t });
+  state.challengeLogs.push({ id:uid(), challengeId:id, name:c.name, points:cpts, coins:coins, dateKey:t, cat:c.category||'other' });
   var newAch=checkAchievements();
   var la=computeDerived().level;
   buzz(15);
   if(la>lb) queueLevelUpToast(la); else if(!newAch.length) queueToast(tierInfo(c.tier||nearestTier(c.points)).label.toUpperCase()+(coins?' \u00b7 +'+fmtMoney(coins):''));
   persist(); render();
 }
-function undoChallenge(id){
-  var t=todayKey();
+function undoChallenge(id,dateKey){
+  var t=dateKey||todayKey();
   for(var i=state.challengeLogs.length-1;i>=0;i--){
     var l=state.challengeLogs[i];
     if(l.challengeId===id && l.dateKey===t){ revokeCoins(l.coins,t); state.challengeLogs.splice(i,1); break; }
@@ -1249,13 +1331,14 @@ function spinWheel(){
     persist(); render();
   },3300);
 }
-function claimWheel(){
-  var w=wheelToday();
+function claimWheel(dateKey){
+  var dk=dateKey||todayKey();
+  var w=(state.wheel && state.wheel.dateKey===dk)?state.wheel:null;
   if(!w || w.status!=='pending') return;
   var lb=computeDerived().level;
-  var coins=awardCoins(w.coins,todayKey());
+  var coins=awardCoins(w.coins,dk);
   w.status='done';
-  state.wheelLog.push({ id:uid(), dateKey:todayKey(), name:w.mission, points:w.points, coins:coins });
+  state.wheelLog.push({ id:uid(), dateKey:dk, name:w.mission, points:w.points, coins:coins });
   var newAch=checkAchievements();
   var la=computeDerived().level;
   if(la>lb) queueLevelUpToast(la); else if(!newAch.length) queueToast('Wheel prize! '+tierInfo(nearestTier(w.points)).label.toUpperCase()+(coins?' \u00b7 +'+fmtMoney(coins):''));
@@ -1401,49 +1484,110 @@ function moveHabit(habitId,dir){
 /* =====================================================================
    ACTIONS — TASKS
    ===================================================================== */
-function addTask(name,tier,deadline){
+function findTask(id){ return (state.tasks||[]).filter(function(t){ return t.id===id; })[0]; }
+function parsePartsText(text){
+  var out=[];
+  String(text||'').split(/\r?\n/).forEach(function(line){
+    line=line.replace(/^\s*(?:[-*\u2022]|\d+[.)]|[A-Za-z][.)])\s+/,'').trim();
+    if(line && out.length<20) out.push(line.slice(0,80));
+  });
+  return out;
+}
+function addTask(name,tier,deadline,partsText){
   name=(name||'').trim();
   if(!name) return;
   if(!validTier(tier)) tier='easy';
   var points=tierPts(tier);
-  state.tasks.push({ id:uid(), name:name.slice(0,80), tier:tier, points:points, deadline:deadline||null, done:false, createdAt:todayKey(), completedAt:null, pointsAwarded:0 });
+  var parts=parsePartsText(partsText).map(function(nm){ return { id:uid(), name:nm, done:false }; });
+  state.tasks.push({ id:uid(), name:name.slice(0,80), tier:tier, points:points, deadline:deadline||null, done:false, createdAt:todayKey(), completedAt:null, pointsAwarded:0, parts:parts });
   ui.showAddTask=false;
   persist(); render();
 }
-function toggleTask(taskId){
-  var task=(state.tasks||[]).filter(function(t){ return t.id===taskId; })[0];
-  if(!task) return;
-  var levelBefore=computeDerived().level, wasDone=task.done;
-  if(task.done){
-    revokeCoins(task.coinsAwarded||0,task.completedAt); task.coinsAwarded=0;
-    task.done=false; task.completedAt=null; task.pointsAwarded=0;
-  } else {
-    if(!validTier(task.tier)) task.tier=nearestTier(task.points);
-    task.points=tierPts(task.tier);
-    task.done=true; task.completedAt=todayKey(); task.pointsAwarded=task.points;
-    task.coinsAwarded=awardCoins(tierCoin(task.tier),task.completedAt);
-    ui.pop='t|'+task.id; buzz(18);
-  }
-  if(wasDone) reconcileAchievements(false);
+function completeTask(task,dateKey){
+  if(!validTier(task.tier)) task.tier=nearestTier(task.points);
+  task.points=tierPts(task.tier);
+  task.done=true; task.completedAt=dateKey||todayKey(); task.pointsAwarded=task.points;
+  task.coinsAwarded=awardCoins(tierCoin(task.tier),task.completedAt);
+  ui.pop='t|'+task.id; buzz(18);
+}
+function reopenTask(task){
+  revokeCoins(task.coinsAwarded||0,task.completedAt); task.coinsAwarded=0;
+  task.done=false; task.completedAt=null; task.pointsAwarded=0;
+}
+function afterTaskChange(levelBefore,reopened){
+  if(reopened) reconcileAchievements(false);
   checkAchievements();
   var levelAfter=computeDerived().level;
   if(levelAfter>levelBefore) queueLevelUpToast(levelAfter);
   persist(); render();
+}
+function toggleTask(taskId,dateKey){
+  var task=findTask(taskId);
+  if(!task) return;
+  var levelBefore=computeDerived().level, wasDone=task.done;
+  if(task.done){
+    reopenTask(task);
+    if(task.parts && task.parts.length) task.parts[task.parts.length-1].done=false;
+  } else {
+    (task.parts||[]).forEach(function(pt){ pt.done=true; });
+    completeTask(task,dateKey);
+  }
+  afterTaskChange(levelBefore,wasDone);
+}
+function togglePart(taskId,partId,dateKey){
+  var task=findTask(taskId);
+  if(!task || !task.parts) return;
+  var part=task.parts.filter(function(x){ return x.id===partId; })[0];
+  if(!part) return;
+  var levelBefore=computeDerived().level, wasDone=task.done;
+  part.done=!part.done;
+  var all=task.parts.every(function(x){ return x.done; });
+  if(all && !task.done) completeTask(task,dateKey);
+  else if(!all && task.done) reopenTask(task);
+  afterTaskChange(levelBefore,wasDone && !all);
 }
 function deleteTask(taskId){
   state.tasks=(state.tasks||[]).filter(function(t){ return t.id!==taskId; });
   ui.pendingDeleteKind=null; ui.pendingDeleteId=null;
   persist(); render();
 }
-function editTask(taskId,name,tier,deadline){
-  var task=(state.tasks||[]).filter(function(t){ return t.id===taskId; })[0];
+function editTask(taskId,name,tier,deadline,partsText){
+  var task=findTask(taskId);
   if(!task) return;
   name=(name||'').trim();
   if(!name) return;
+  var levelBefore=computeDerived().level;
   task.name=name.slice(0,80);
   if(!task.done){ if(validTier(tier)) task.tier=tier; task.points=tierPts(task.tier); }
   task.deadline=deadline||null;
+  if(!task.done){
+    var old=task.parts||[], used={};
+    task.parts=parsePartsText(partsText).map(function(nm){
+      var m=old.filter(function(x){ return !used[x.id] && x.name===nm; })[0];
+      if(m){ used[m.id]=1; return m; }
+      return { id:uid(), name:nm, done:false };
+    });
+    if(task.parts.length && task.parts.every(function(x){ return x.done; })) completeTask(task);
+  }
   ui.editingTaskId=null;
+  afterTaskChange(levelBefore,false);
+}
+function moveTask(id,dir){
+  var open=(state.tasks||[]).filter(function(t){ return !t.done; });
+  var i=open.findIndex(function(t){ return t.id===id; }), j=i+dir;
+  if(i<0||j<0||j>=open.length) return;
+  var a=state.tasks.indexOf(open[i]), b=state.tasks.indexOf(open[j]);
+  var tmp=state.tasks[a]; state.tasks[a]=state.tasks[b]; state.tasks[b]=tmp;
+  persist(); render();
+}
+function sortTasksByDeadline(){
+  var open=(state.tasks||[]).filter(function(t){ return !t.done; });
+  var sorted=open.slice().sort(function(a,b){
+    if(a.deadline&&b.deadline) return compareKeys(a.deadline,b.deadline);
+    if(a.deadline) return -1; if(b.deadline) return 1; return 0;
+  });
+  var k=0;
+  state.tasks=state.tasks.map(function(t){ return t.done?t:sorted[k++]; });
   persist(); render();
 }
 
@@ -1733,8 +1877,8 @@ function normalizeState(s){
   if(s.settings.pinHash===undefined) s.settings.pinHash=null;
   if(s.settings.pending===undefined) s.settings.pending=null;
   if(!s.settings.tierCoins) s.settings.tierCoins={};
-  if(!s.challenges) s.challenges=DEFAULT_CHALLENGES.map(function(c){ return { id:uid(), name:c[0], points:c[1], tier:nearestTier(c[1]), limit:3 }; });
-  s.challenges.forEach(function(c){ if(c.limit===undefined) c.limit=0; if(!validTier(c.tier)) c.tier=nearestTier(c.points); });
+  if(!s.challenges) s.challenges=DEFAULT_CHALLENGES.map(function(c){ return { id:uid(), name:c[0], points:c[1], tier:nearestTier(c[1]), limit:3, category:'health' }; });
+  s.challenges.forEach(function(c){ if(c.limit===undefined) c.limit=0; if(!validTier(c.tier)) c.tier=nearestTier(c.points); if(!validCategory(c.category)) c.category=guessCategory(c.name); });
   (s.tasks||[]).forEach(function(t){ if(!validTier(t.tier)) t.tier=nearestTier(t.points); });
   if(!s.challengeLogs) s.challengeLogs=[];
   if(!s.wheelLog) s.wheelLog=[];
@@ -1855,6 +1999,24 @@ function renderTabs(){
 /* =====================================================================
    RENDER — TODAY
    ===================================================================== */
+function taskMainHtml(task){
+  var np=task.parts?task.parts.length:0;
+  var lead;
+  if(np){
+    lead='<span class="part-count'+(task.done?' done':'')+'">'+task.parts.filter(function(x){ return x.done; }).length+'/'+np+'</span>';
+  } else {
+    lead='<button class="check-circle'+(task.done?' done':'')+(ui.pop==='t|'+task.id?' pop':'')+'" data-action="toggle-task" data-task="'+task.id+'" aria-label="'+(task.done?'Undo ':'Complete ')+esc(task.name)+'">'+checkIconSvg()+'</button>';
+  }
+  return '<div class="row">'+lead+'<div><div class="'+(task.done?'task-done':'')+'">'+esc(task.name)+'</div>'+(task.done?'':dueHtml(task))+'</div></div>';
+}
+function taskPartsHtml(task){
+  if(!task.parts || !task.parts.length) return '';
+  var h='<div class="parts">';
+  task.parts.forEach(function(pt){
+    h+='<div class="part-row'+(pt.done?' part-done':'')+'"><button class="check-circle sm'+(pt.done?' done':'')+'" data-action="toggle-part" data-task="'+task.id+'" data-part="'+pt.id+'" aria-label="'+(pt.done?'Undo ':'Complete ')+esc(pt.name)+'">'+checkIconSvg()+'</button><span>'+esc(pt.name)+'</span></div>';
+  });
+  return h+'</div>';
+}
 function dueHtml(task){
   if(!task.deadline) return '';
   var over=compareKeys(task.deadline,todayKey())<0;
@@ -1881,30 +2043,23 @@ function renderToday(glance){
           '<button class="check-circle'+(isDone?' done':'')+(isRest?' rest':'')+(ui.pop===h.id+'|'+t?' pop':'')+'" data-action="toggle-habit" data-habit="'+h.id+'" data-date="'+t+'" aria-label="Mark '+esc(h.name)+' done">'+checkIconSvg()+'</button>'+
           '<div><div>'+esc(h.name)+'</div><div class="habit-meta">'+(isRest?'Rest day \u00b7 streak safe':(streak>0?streak+'-day streak':'no streak yet'))+'</div></div>'+
         '</div>'+
-        '<div class="row">'+tierTag(h.difficulty)+'<button class="icon-btn edit-pen" data-action="quick-edit" data-kind="habit" data-id="'+h.id+'" aria-label="Edit '+esc(h.name)+'">\u270E</button></div>'+
+        tierTag(h.difficulty)+
       '</div>';
     });
     habitsInner+='</div>';
   }
 
-  var allOpen=(state.tasks||[]).filter(function(x){ return !x.done; }).sort(function(a,b){
-    if(a.deadline&&b.deadline) return compareKeys(a.deadline,b.deadline);
-    if(a.deadline) return -1; if(b.deadline) return 1; return 0;
-  });
-  var openTasks=allOpen.slice(0,glance?12:5);
-  var tasksInner='<div class="row-between" style="margin-bottom:10px;"><h2 class="section-title" style="margin:0;">Open tasks</h2><span class="faint">'+allOpen.length+' open</span></div>';
-  if(!openTasks.length){
+  var allOpen=(state.tasks||[]).filter(function(x){ return !x.done; });
+  var doneTodayTasks=(state.tasks||[]).filter(function(x){ return x.done && x.completedAt===t; });
+  var tasksInner='<div class="row-between" style="margin-bottom:10px;"><h2 class="section-title" style="margin:0;">Tasks</h2><span class="faint">'+allOpen.length+' open'+(doneTodayTasks.length?' \u00b7 '+doneTodayTasks.length+' done today':'')+'</span></div>';
+  if(!allOpen.length && !doneTodayTasks.length){
     tasksInner+='<div class="empty">All clear. Nothing on your list right now.</div>';
   } else {
     tasksInner+='<div class="stack">';
-    openTasks.forEach(function(task){
-      tasksInner+='<div class="row-between">'+
-        '<div class="row"><button class="check-circle'+(ui.pop==='t|'+task.id?' pop':'')+'" data-action="toggle-task" data-task="'+task.id+'" aria-label="Complete '+esc(task.name)+'">'+checkIconSvg()+'</button><div><div>'+esc(task.name)+'</div>'+dueHtml(task)+'</div></div>'+
-        '<div class="row">'+tierTag(task.tier||nearestTier(task.points))+'<button class="icon-btn edit-pen" data-action="quick-edit" data-kind="task" data-id="'+task.id+'" aria-label="Edit">\u270E</button></div>'+
-      '</div>';
+    allOpen.concat(doneTodayTasks).forEach(function(task){
+      tasksInner+='<div class="task-block"><div class="row-between">'+taskMainHtml(task)+'<div class="row">'+tierTag(task.tier||nearestTier(task.points))+'</div></div>'+taskPartsHtml(task)+'</div>';
     });
     tasksInner+='</div>';
-    if(allOpen.length>openTasks.length) tasksInner+='<div class="faint" style="margin-top:10px;">+ '+(allOpen.length-openTasks.length)+' more in the Tasks tab</div>';
   }
 
   var chalToday=state.challengeLogs.filter(function(l){ return l.dateKey===t; }).length;
@@ -1920,7 +2075,7 @@ function renderTodayChallenges(){
     state.challenges.forEach(function(c){
       var n=challengeCountToday(c.id), atLimit=c.limit>0 && n>=c.limit;
       inner+='<div class="row-between"><div style="min-width:0;"><div>'+esc(c.name)+'</div><div class="habit-meta">today '+n+(c.limit>0?' / '+c.limit:'')+'</div></div>'+
-        '<div class="row">'+tierTag(c.tier)+'<button class="icon-btn edit-pen" data-action="quick-edit" data-kind="challenge" data-id="'+c.id+'" aria-label="Edit">\u270E</button>'+(n>0?'<button class="icon-btn" data-action="undo-challenge" data-id="'+c.id+'" aria-label="Undo one">\u2212</button>':'')+
+        '<div class="row">'+tierTag(c.tier)+(n>0?'<button class="icon-btn" data-action="undo-challenge" data-id="'+c.id+'" aria-label="Undo one">\u2212</button>':'')+
         '<button class="add-circle'+(atLimit?' maxed':'')+'" data-action="log-challenge" data-id="'+c.id+'" '+(atLimit?'disabled':'')+' aria-label="Log '+esc(c.name)+'">'+(atLimit?checkIconSvg():'+')+'</button></div></div>';
     });
     inner+='</div>';
@@ -1944,7 +2099,7 @@ function renderArchive(){
     done.forEach(function(x){
       if(x.completedAt!==last){ last=x.completedAt; inner+='<div class="arch-day">'+fmtFull(x.completedAt)+'</div>'; }
       var took=(x.createdAt&&x.completedAt)?daysBetween(x.createdAt,x.completedAt):null;
-      inner+='<div class="arch-row"><div style="min-width:0;"><div>'+esc(x.name)+'</div><div class="habit-meta">Added '+fmtFull(x.createdAt)+' \u00b7 Finished '+fmtFull(x.completedAt)+(took!==null?' \u00b7 '+(took===0?'same day':took+(took===1?' day':' days')):'')+'</div></div><div class="row">'+tierTag(x.tier||nearestTier(x.points))+(x.completedAt===todayKey()?'<button class="icon-btn" data-action="toggle-task" data-task="'+x.id+'">Reopen</button>':'')+'</div></div>';
+      inner+='<div class="arch-row"><div style="min-width:0;"><div>'+esc(x.name)+'</div><div class="habit-meta">Added '+fmtFull(x.createdAt)+' \u00b7 Finished '+fmtFull(x.completedAt)+(took!==null?' \u00b7 '+(took===0?'same day':took+(took===1?' day':' days')):'')+(x.parts&&x.parts.length?' \u00b7 '+x.parts.length+' parts':'')+'</div></div><div class="row">'+tierTag(x.tier||nearestTier(x.points))+(x.completedAt===todayKey()?'<button class="icon-btn" data-action="toggle-task" data-task="'+x.id+'">Reopen</button>':'')+'</div></div>';
     });
   }
   return card(null,inner);
@@ -1981,6 +2136,7 @@ function renderChallengesTab(){
           '<div class="field"><label for="ec-name-'+c.id+'">Challenge</label><input type="text" id="ec-name-'+c.id+'" name="name" value="'+esc(c.name)+'" maxlength="60" required></div>'+
           '<div class="field-row"><div class="field"><label for="ec-tier-'+c.id+'">Reward</label>'+tierSelectHtml('ec-tier-'+c.id,'tier',c.tier)+'</div>'+
           '<div class="field"><label for="ec-lim-'+c.id+'">Max per day (0 = no limit)</label><input type="number" id="ec-lim-'+c.id+'" name="limit" value="'+(c.limit||0)+'" min="0" max="99"></div></div>'+
+          '<div class="field"><label for="ec-cat-'+c.id+'">Skill it grows</label>'+categorySelectHtml('ec-cat-'+c.id,'category',c.category||'other')+'</div>'+
           '<div class="row"><button type="submit" class="btn btn-sage">Save</button><button type="button" class="btn btn-ghost" data-action="cancel-edit-challenge">Cancel</button></div></form></div>';
         return;
       }
@@ -1989,7 +2145,7 @@ function renderChallengesTab(){
         return;
       }
       inner+='<div class="chal-row"><div style="min-width:0;"><div>'+esc(c.name)+'</div>'+
-        '<div class="chal-meta">'+tierTag(c.tier)+'<span class="chip">today '+n+(c.limit>0?' / '+c.limit:'')+'</span><span class="chip">all time '+total+'</span></div>'+
+        '<div class="chal-meta">'+tierTag(c.tier)+'<span class="chip" style="color:'+categoryInfo(c.category).color+';">'+categoryInfo(c.category).label+'</span><span class="chip">today '+n+(c.limit>0?' / '+c.limit:'')+'</span><span class="chip">all time '+total+'</span></div>'+
         '<div class="row" style="margin-top:8px;"><button class="icon-btn" data-action="edit-challenge" data-id="'+c.id+'">Edit</button><button class="icon-btn" data-action="ask-delete" data-kind="challenge" data-id="'+c.id+'">Remove</button>'+
         '<div class="reorder-col"><button class="reorder-btn" data-action="move-challenge-up" data-id="'+c.id+'" '+(idx===0?'disabled':'')+' aria-label="Move up">&#9650;</button><button class="reorder-btn" data-action="move-challenge-down" data-id="'+c.id+'" '+(idx===state.challenges.length-1?'disabled':'')+' aria-label="Move down">&#9660;</button></div></div></div>'+
         '<div class="row">'+(n>0?'<button class="btn btn-ghost btn-sm" data-action="undo-challenge" data-id="'+c.id+'">Undo</button>':'')+
@@ -2002,11 +2158,50 @@ function renderChallengesTab(){
     inner+='<form data-form="add-challenge" class="stack"><div class="field"><label for="ch-name">Challenge</label><input type="text" id="ch-name" name="name" placeholder="e.g. Take a walk \u2014 1 km" maxlength="60" required autofocus></div>'+
       '<div class="field-row"><div class="field"><label for="ch-tier">Reward</label>'+tierSelectHtml('ch-tier','tier','easy')+'</div>'+
       '<div class="field"><label for="ch-lim">Max per day (0 = no limit)</label><input type="number" id="ch-lim" name="limit" value="3" min="0" max="99"></div></div>'+
+      '<div class="field"><label for="ch-cat">Skill it grows</label>'+categorySelectHtml('ch-cat','category','health')+'</div>'+
       '<div class="row"><button type="submit" class="btn btn-sage">Add challenge</button><button type="button" class="btn btn-ghost" data-action="cancel-add-challenge">Cancel</button></div></form>';
   } else inner+='<button class="btn btn-sage btn-block" data-action="show-add-challenge">+ Add a challenge</button>';
   html+=card(null,inner);
   html+=renderWheelCard();
   return html;
+}
+function coinLogEntries(){
+  var out=[];
+  (state.habits||[]).forEach(function(h){
+    var c=h.coins||{};
+    Object.keys(c).forEach(function(k){ if(c[k]>0) out.push({ date:k, kind:'Habit', name:h.name, cents:c[k] }); });
+  });
+  (state.tasks||[]).forEach(function(t){ if(t.done && t.coinsAwarded>0) out.push({ date:t.completedAt||'', kind:'Task', name:t.name, cents:t.coinsAwarded }); });
+  (state.challengeLogs||[]).forEach(function(l){ if(l.coins>0) out.push({ date:l.dateKey, kind:'Challenge', name:l.name, cents:l.coins }); });
+  (state.wheelLog||[]).forEach(function(l){ if(l.coins>0) out.push({ date:l.dateKey, kind:'Daily wheel', name:l.name, cents:l.coins }); });
+  (state.achievements||[]).forEach(function(u){
+    if(u.coins>0){ var a=ACHIEVEMENTS.filter(function(x){ return x.id===u.id; })[0]; out.push({ date:u.unlockedAt||'', kind:'Achievement', name:a?a.name:u.id, cents:u.coins }); }
+  });
+  ((state.wallet&&state.wallet.spent)||[]).forEach(function(x){ out.push({ date:x.at||'', kind:'Spent', name:x.name||'Spent', cents:-x.cents }); });
+  out.sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); });
+  return out;
+}
+function renderCoinLog(){
+  var all=coinLogEntries(), limit=ui.coinLogLimit||40, list=all.slice(0,limit);
+  var inner='<div class="row-between" style="margin-bottom:4px;"><h2 class="section-title" style="margin:0;">Coin history</h2><span class="faint">'+all.length+' entries</span></div>'+
+    '<div class="faint" style="margin-bottom:12px;">Where every coin came from, newest first.</div>';
+  if(!list.length){
+    inner+='<div class="empty">No coins yet. Finish a habit, task or challenge to earn some.</div>';
+  } else {
+    var dayTotal={}; all.forEach(function(e){ dayTotal[e.date]=(dayTotal[e.date]||0)+e.cents; });
+    var last=null;
+    inner+='<div class="stack">';
+    list.forEach(function(e){
+      if(e.date!==last){
+        last=e.date;
+        inner+='<div class="arch-day row-between"><span>'+(e.date?fmtFull(e.date):'Earlier')+'</span><span>'+(dayTotal[e.date]<0?'-':'+')+fmtMoney(Math.abs(dayTotal[e.date]))+'</span></div>';
+      }
+      inner+='<div class="row-between coin-row"><div style="min-width:0;"><div>'+esc(e.name)+'</div><div class="habit-meta">'+e.kind+'</div></div><span class="'+(e.cents<0?'c-brick':'c-gold')+'">'+(e.cents<0?'-':'+')+fmtMoney(Math.abs(e.cents))+'</span></div>';
+    });
+    inner+='</div>';
+    if(all.length>limit) inner+='<button class="btn btn-ghost btn-sm" style="margin-top:12px;" data-action="coin-log-more">Show more</button>';
+  }
+  return card(null,inner);
 }
 function renderWallet(){
   var w=state.wallet, cap=state.settings.coinCapCents, day=w.daily[todayKey()]||0, boost=boostPercent();
@@ -2016,6 +2211,7 @@ function renderWallet(){
     '<div class="faint" style="margin:8px 0 14px;">Earned today '+fmtMoney(day)+(w.cents>=cap-0.5?' \u00b7 wallet full \u2014 spend some!':'')+(w.cents<0?' \u00b7 negative balance: you undid check-ins after spending those coins, new earnings pay it off':'')+'</div>'+
     '<form data-form="spend-coins"><div class="spend-row"><div class="field"><label for="sp-amt">Amount spent ($)</label><input type="number" id="sp-amt" name="amount" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" required></div><button type="submit" class="btn btn-peri">Spend</button></div></form>';
   var html=card('Real-world coins',inner);
+  html+=renderCoinLog();
 
   var rows='';
   (state.habits||[]).filter(function(h){ return !h.archived; }).forEach(function(h){
@@ -2191,6 +2387,7 @@ function renderTasks(){
         '<div class="field"><label for="task-tier">Reward</label>'+tierSelectHtml('task-tier','tier','easy')+'</div>'+
         '<div class="field"><label for="task-deadline">Deadline (optional)</label><input type="date" id="task-deadline" name="deadline"></div>'+
       '</div>'+
+      '<div class="field"><label for="task-parts">Parts (optional, one per line)</label><textarea id="task-parts" name="parts" rows="3" placeholder="Part 1&#10;Part 2"></textarea></div>'+
       '<div class="row"><button type="submit" class="btn btn-sage">Add task</button><button type="button" class="btn btn-ghost" data-action="cancel-add-task">Cancel</button></div>'+
     '</form>';
   } else {
@@ -2198,17 +2395,14 @@ function renderTasks(){
   }
   html+=card('New',addInner);
 
-  var open=(state.tasks||[]).filter(function(t){ return !t.done; }).sort(function(a,b){
-    if(a.deadline&&b.deadline) return compareKeys(a.deadline,b.deadline);
-    if(a.deadline) return -1; if(b.deadline) return 1; return 0;
-  });
+  var open=(state.tasks||[]).filter(function(t){ return !t.done; });
   var done=(state.tasks||[]).filter(function(t){ return t.done; }).sort(function(a,b){ return compareKeys(b.completedAt,a.completedAt); }).slice(0,10);
 
-  var openInner='<h2 class="section-title" style="margin-bottom:10px;">Open ('+open.length+')</h2>';
+  var openInner='<div class="row-between" style="margin-bottom:10px;"><h2 class="section-title" style="margin:0;">Open ('+open.length+')</h2>'+(open.length>1?'<button class="icon-btn" data-action="sort-tasks">Sort by deadline</button>':'')+'</div>';
   if(!open.length){ openInner+='<div class="empty">All caught up.</div>'; }
   else{
     openInner+='<div class="stack">';
-    open.forEach(function(task){
+    open.forEach(function(task,idx){
       if(ui.editingTaskId===task.id){
         openInner+='<div class="edit-panel"><form data-form="edit-task" class="stack">'+
           '<input type="hidden" name="id" value="'+task.id+'">'+
@@ -2217,15 +2411,15 @@ function renderTasks(){
             '<div class="field"><label for="et-tier-'+task.id+'">Reward</label>'+tierSelectHtml('et-tier-'+task.id,'tier',task.tier||nearestTier(task.points))+'</div>'+
             '<div class="field"><label for="et-deadline-'+task.id+'">Deadline (optional)</label><input type="date" id="et-deadline-'+task.id+'" name="deadline" value="'+(task.deadline||'')+'"></div>'+
           '</div>'+
+          '<div class="field"><label for="et-parts-'+task.id+'">Parts (optional, one per line)</label><textarea id="et-parts-'+task.id+'" name="parts" rows="3" placeholder="Part 1&#10;Part 2">'+esc((task.parts||[]).map(function(x){ return x.name; }).join('\n'))+'</textarea></div>'+
           '<div class="row"><button type="submit" class="btn btn-sage">Save</button><button type="button" class="btn btn-ghost" data-action="cancel-edit-task">Cancel</button></div>'+
         '</form></div>';
       } else if(ui.pendingDeleteKind==='task' && ui.pendingDeleteId===task.id){
         openInner+='<div class="confirm-inline"><span class="muted">Remove "'+esc(task.name)+'"?</span><button class="btn btn-brick btn-sm" data-action="confirm-delete" data-kind="task" data-id="'+task.id+'">Yes, remove</button><button class="btn btn-ghost btn-sm" data-action="cancel-delete">Cancel</button></div>';
       } else {
-        openInner+='<div class="row-between">'+
-          '<div class="row"><button class="check-circle'+(ui.pop==='t|'+task.id?' pop':'')+'" data-action="toggle-task" data-task="'+task.id+'" aria-label="Complete '+esc(task.name)+'">'+checkIconSvg()+'</button><div><div>'+esc(task.name)+'</div>'+dueHtml(task)+'</div></div>'+
-          '<div class="row">'+tierTag(task.tier||nearestTier(task.points))+'<button class="icon-btn" data-action="edit-task" data-task="'+task.id+'">Edit</button><button class="icon-btn" data-action="ask-delete" data-kind="task" data-id="'+task.id+'">Remove</button></div>'+
-        '</div>';
+        openInner+='<div class="task-block"><div class="row-between">'+taskMainHtml(task)+
+          '<div class="row">'+tierTag(task.tier||nearestTier(task.points))+'<button class="icon-btn" data-action="edit-task" data-task="'+task.id+'">Edit</button><button class="icon-btn" data-action="ask-delete" data-kind="task" data-id="'+task.id+'">Remove</button>'+
+          '<div class="reorder-col"><button class="reorder-btn" data-action="move-task-up" data-task="'+task.id+'" '+(idx===0?'disabled':'')+' aria-label="Move up">&#9650;</button><button class="reorder-btn" data-action="move-task-down" data-task="'+task.id+'" '+(idx===open.length-1?'disabled':'')+' aria-label="Move down">&#9660;</button></div></div></div>'+taskPartsHtml(task)+'</div>';
       }
     });
     openInner+='</div>';
@@ -2653,6 +2847,11 @@ function onClick(e){
     case 'move-habit-up': moveHabit(el.getAttribute('data-habit'),-1); break;
     case 'move-habit-down': moveHabit(el.getAttribute('data-habit'),1); break;
     case 'toggle-task': toggleTask(el.getAttribute('data-task')); break;
+    case 'coin-log-more': ui.coinLogLimit=(ui.coinLogLimit||40)+40; render(); break;
+    case 'toggle-part': togglePart(el.getAttribute('data-task'),el.getAttribute('data-part')); break;
+    case 'move-task-up': moveTask(el.getAttribute('data-task'),-1); break;
+    case 'move-task-down': moveTask(el.getAttribute('data-task'),1); break;
+    case 'sort-tasks': sortTasksByDeadline(); break;
     case 'show-add-task': ui.showAddTask=true; render(); break;
     case 'cancel-add-task': ui.showAddTask=false; render(); break;
     case 'edit-task': ui.editingTaskId=el.getAttribute('data-task'); render(); break;
@@ -2706,14 +2905,14 @@ function onSubmit(e){
   switch(type){
     case 'add-habit': addHabit(fd.get('name'),fd.get('difficulty'),fd.get('category')); break;
     case 'edit-habit': updateHabit(fd.get('id'),fd.get('name'),fd.get('difficulty'),fd.get('category')); break;
-    case 'add-task': addTask(fd.get('name'),fd.get('tier'),fd.get('deadline')); break;
-    case 'edit-task': editTask(fd.get('id'),fd.get('name'),fd.get('tier'),fd.get('deadline')); break;
+    case 'add-task': addTask(fd.get('name'),fd.get('tier'),fd.get('deadline'),fd.get('parts')); break;
+    case 'edit-task': editTask(fd.get('id'),fd.get('name'),fd.get('tier'),fd.get('deadline'),fd.get('parts')); break;
     case 'add-shop-item': addShopItem(fd.get('name'),fd.get('cost')); break;
     case 'edit-shop-item': editShopItem(fd.get('id'),fd.get('name'),fd.get('cost')); break;
     case 'pin-submit': submitPin(fd.get('pin'),fd.get('pin2')); break;
     case 'change-pin': changePin(fd.get('pin'),fd.get('pin2')); break;
-    case 'add-challenge': addChallenge(fd.get('name'),fd.get('tier'),fd.get('limit')); break;
-    case 'edit-challenge': editChallenge(fd.get('id'),fd.get('name'),fd.get('tier'),fd.get('limit')); break;
+    case 'add-challenge': addChallenge(fd.get('name'),fd.get('tier'),fd.get('limit'),fd.get('category')); break;
+    case 'edit-challenge': editChallenge(fd.get('id'),fd.get('name'),fd.get('tier'),fd.get('limit'),fd.get('category')); break;
     case 'spend-coins': spendCoins(Math.round(parseFloat(fd.get('amount'))*100)); break;
     case 'start-emergency': startTimer('emergency',fd.get('reason')); break;
     case 'manual-log': logManualSession(fd.get('type'),fd.get('minutes'),fd.get('reason')); break;
