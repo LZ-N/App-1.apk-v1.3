@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="4">
+<meta name="app-version" content="5">
 <script>
 /* Self-update (Android app only). The app checks the website copy of this file in the background.
    When its app-version number is higher, it keeps the new copy and uses it from the next launch.
@@ -29,17 +29,26 @@
     }
     ls.setItem('ota_fail',String(fails+1));
     if(U.indexOf('http')!==0) return;
-    setTimeout(function(){
-      fetch(U+(U.indexOf('?')<0?'?':'&')+'t='+Date.now(),{cache:'no-store'})
+    var running=V;
+    function check(){
+      return fetch(U+(U.indexOf('?')<0?'?':'&')+'t='+Date.now(),{cache:'no-store'})
         .then(function(r){ if(!r.ok) throw 0; return r.text(); })
         .then(function(t){
           var m=t.match(/name="app-version" content="(\d+)"/); var rv=m?parseInt(m[1],10):0;
-          if(rv>Math.max(V,cv,bad) && t.indexOf('</html>')>0 && t.indexOf('</scr'+'ipt>')>0){
-            ls.setItem('ota_html',t.split(TOKEN).join(U)); ls.setItem('ota_ver',String(rv));
-            window.__ota_ready=rv; window.dispatchEvent(new Event('ota-ready'));
+          var have=Math.max(V,cv,bad,window.__ota_ready||0);
+          if(rv>have){
+            if(t.indexOf('</html>')>0 && t.indexOf('</scr'+'ipt>')>0){
+              ls.setItem('ota_html',t.split(TOKEN).join(U)); ls.setItem('ota_ver',String(rv));
+              window.__ota_ready=rv; window.dispatchEvent(new Event('ota-ready'));
+              return { status:'ready', version:rv };
+            }
+            return { status:'error' };
           }
-        }).catch(function(){});
-    },2500);
+          return { status:window.__ota_ready?'ready':'current', version:window.__ota_ready||running };
+        });
+    }
+    window.__ascendUpdate={ url:U, check:check };
+    setTimeout(function(){ check().catch(function(){}); },2500);
   }catch(e){}
 })();
 </script>
@@ -433,6 +442,8 @@
   .cal-main .totals-cell{padding:10px 10px;}
   .cal-main .totals-val{font-size:18px;}
   .cal-main .totals-label{font-size:9.5px;}
+  .upd-line{margin-top:10px;font-size:13.5px;line-height:1.5;}
+  .upd-line .btn{margin-left:4px;}
 </style>
 </head>
 <body>
@@ -2855,6 +2866,75 @@ function renderSettingsGate(){
   }
   return '';
 }
+function appVersionNumber(){ return ((document.querySelector('meta[name="app-version"]')||{}).content)||'?'; }
+function checkNativeUpdate(){
+  var B=nativePlugin('WidgetBridge');
+  var U=(window.__ascendUpdate||{}).url||'';
+  var m=U.match(/^https:\/\/([^.\/]+)\.github\.io\/([^\/]+)\//);
+  if(!B || typeof B.getAppInfo!=='function' || !m) return Promise.resolve({ status:'unsupported' });
+  return B.getAppInfo().then(function(info){
+    return fetch('https://api.github.com/repos/'+m[1]+'/'+m[2]+'/releases/latest',{ headers:{ Accept:'application/vnd.github+json' }, cache:'no-store' }).then(function(r){
+      if(r.status===404) return { status:'norelease' };
+      if(!r.ok) throw 0;
+      return r.json();
+    }).then(function(rel){
+      if(rel.status) return rel;
+      var num=parseInt((String(rel.tag_name||'').match(/(\d+)$/)||[])[1],10)||0;
+      var rh=(String(rel.body||'').match(/native=([0-9a-f]{12})/)||[])[1]||null;
+      var lh=(String(info.versionName||'').match(/-([0-9a-f]{12})$/)||[])[1]||null;
+      var asset=(rel.assets||[]).filter(function(a){ return /\.apk$/i.test(a.name); })[0];
+      var needs=num>info.versionCode && asset && (!rh || !lh || rh!==lh);
+      return needs?{ status:'available', build:num, url:asset.browser_download_url }:{ status:'current', build:info.versionCode, latest:num };
+    });
+  });
+}
+function runUpdateCheck(){
+  ui.upd={ busy:true, web:null, native:null, msg:null };
+  render();
+  var web=(window.__ascendUpdate && window.__ascendUpdate.check)?window.__ascendUpdate.check().catch(function(){ return { status:'error' }; }):Promise.resolve({ status:'unsupported' });
+  var nat=checkNativeUpdate().catch(function(){ return { status:'error' }; });
+  Promise.all([web,nat]).then(function(r){ ui.upd={ busy:false, web:r[0], native:r[1], msg:null }; render(); });
+}
+function installNativeUpdate(){
+  var B=nativePlugin('WidgetBridge'), u=ui.upd||{};
+  if(!B || !u.native || u.native.status!=='available') return;
+  u.installing=true; u.msg='Downloading\u2026 this can take a moment.'; render();
+  B.installApk({ url:u.native.url }).then(function(){
+    u.msg='The installer is open. Tap Update to finish.';
+  }).catch(function(e){
+    var m=(e && e.message)?String(e.message):'';
+    u.msg=/needs_permission/.test(m)?'Allow Ascend to install apps in the screen that just opened, come back and tap the button again.':'That did not work: '+m;
+  }).then(function(){ u.installing=false; render(); });
+}
+function renderUpdatesCard(){
+  var u=ui.upd||{}, B=nativePlugin('WidgetBridge');
+  if(B && typeof B.getAppInfo==='function' && !ui.nativeInfoAsked){
+    ui.nativeInfoAsked=true;
+    try{ B.getAppInfo().then(function(i){ ui.nativeInfo=i; render(); }).catch(function(){}); }catch(e){}
+  }
+  var info=ui.nativeInfo;
+  var inner='<h2 class="section-title" style="margin-bottom:6px;">Updates</h2>'+
+    '<div class="faint" style="margin-bottom:10px;">App version '+esc(appVersionNumber())+(info?' \u00b7 Android build '+esc(String(info.versionCode)):'')+'</div>';
+  if(!B){
+    return card('Updates',inner+'<div class="faint">This is the browser version. It updates when you reload the page.</div>');
+  }
+  inner+='<button class="btn btn-sage btn-block" data-action="check-updates" '+(u.busy?'disabled':'')+'>'+(u.busy?'Checking\u2026':'Check for updates')+'</button>';
+  if(u.web){
+    if(u.web.status==='ready') inner+='<div class="upd-line">Screens: version '+esc(String(u.web.version))+' is ready. <button class="btn btn-sm" data-action="apply-update-now">Apply now</button></div>';
+    else if(u.web.status==='current') inner+='<div class="upd-line">Screens: up to date.</div>';
+    else if(u.web.status==='unsupported') inner+='<div class="upd-line">Screens: automatic updates are not set up in this build.</div>';
+    else inner+='<div class="upd-line">Screens: could not reach the update server.</div>';
+  }
+  if(u.native){
+    if(u.native.status==='available') inner+='<div class="upd-line">Android app: a new version (build '+esc(String(u.native.build))+') is available. <button class="btn btn-sm btn-primary" data-action="install-update" '+(u.installing?'disabled':'')+'>Download and install</button></div>';
+    else if(u.native.status==='current') inner+='<div class="upd-line">Android app: up to date.</div>';
+    else if(u.native.status==='norelease') inner+='<div class="upd-line">Android app: no published build found yet.</div>';
+    else if(u.native.status==='unsupported') inner+='<div class="upd-line">Android app: update check is not set up in this build.</div>';
+    else inner+='<div class="upd-line">Android app: could not reach the update server.</div>';
+  }
+  if(u.msg) inner+='<div class="upd-line">'+esc(u.msg)+'</div>';
+  return card('Updates',inner);
+}
 function renderSettings(){
   var gate=renderSettingsGate();
   if(gate) return gate;
@@ -2884,6 +2964,7 @@ function renderSettings(){
     '<button type="submit" class="btn btn-sage">Save</button>'+
     '<div class="faint">You can finish the day\'s habits, tasks and challenges until this time. You can also press End day on the Today tab during the last 12 hours of a day. A day never lasts longer than 36 hours.</div></form>';
   html+=card('Day',dayInner);
+  html+=renderUpdatesCard();
   html+=card('Configuration',formInner);
   html+=card('Security','<h2 class="section-title" style="margin-bottom:10px;">PIN</h2><form data-form="change-pin" class="stack"><div class="field-row"><div class="field"><label for="np1">New PIN</label><input type="password" inputmode="numeric" autocomplete="off" id="np1" name="pin" maxlength="8"></div><div class="field"><label for="np2">Repeat</label><input type="password" inputmode="numeric" autocomplete="off" id="np2" name="pin2" maxlength="8"></div></div><div class="row"><button type="submit" class="btn">Change PIN</button><button type="button" class="btn btn-ghost" data-action="lock-settings">Lock now</button></div></form>');
 
@@ -3135,6 +3216,9 @@ function onClick(e){
     case 'open-window': ui.win=el.getAttribute('data-win'); ui.coinLogLimit=40; render(); break;
     case 'close-window': ui.win=null; render(); break;
     case 'toggle-achv-done': state.settings.achvShowDone=!state.settings.achvShowDone; persist(); render(); break;
+    case 'check-updates': runUpdateCheck(); break;
+    case 'install-update': installNativeUpdate(); break;
+    case 'apply-update-now': location.reload(); break;
     case 'end-day-ask': ui.confirmEndDay=true; render(); break;
     case 'end-day-cancel': ui.confirmEndDay=false; render(); break;
     case 'end-day-confirm': endDay(); break;
