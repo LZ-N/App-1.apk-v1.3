@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -58,3 +61,13 @@ jobs:
         with:
           name: ascend-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish the APK as a release (the app downloads updates from here)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk ascend.apk
+          HASH=$(sha256sum setup_android.py | cut -c1-12)
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" ascend.apk --target "${{ github.sha }}" --title "Build ${{ github.run_number }}" --notes "Automatic build. native=$HASH" --latest \
+            || gh release upload "$TAG" ascend.apk --clobber
