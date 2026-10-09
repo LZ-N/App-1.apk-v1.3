@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Update test: this comment only marks a new Android build.
 """Builds the Ascend Android project from the flat files in this repo.
 Run by the GitHub workflow: creates the Capacitor Android project, then adds the Today widget."""
 import base64, hashlib, os, re, shutil, subprocess, sys
